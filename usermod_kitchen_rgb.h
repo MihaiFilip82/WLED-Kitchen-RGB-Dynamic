@@ -2,19 +2,33 @@
 
 #include "wled.h"
 
+// ==================================================
+// NUMELE EFECTELOR
+// ==================================================
+
 static const char _data_FX_MODE_KITCHEN_RGB_WAVE[] PROGMEM =
   "Kitchen RGB Wave Flow@ON Time,Color Length,OFF Time,Flow Speed,Wave Fade,Rainbow,Use Color 2,Use Color 3;Color 1,Color 2,Color 3;;";
+
+static const char _data_FX_MODE_KITCHEN_WARM_WHITE[] PROGMEM =
+  "Kitchen Warm White Wave@ON Time,Wave Fade,OFF Time;Brightness;;";
+
+static const char _data_FX_MODE_KITCHEN_NEUTRAL_WHITE[] PROGMEM =
+  "Kitchen Neutral White Wave@ON Time,Wave Fade,OFF Time;Brightness;;";
+
+static const char _data_FX_MODE_KITCHEN_COOL_WHITE[] PROGMEM =
+  "Kitchen Cool White Wave@ON Time,Wave Fade,OFF Time;Brightness;;";
+
 
 class KitchenRGBUsermod : public Usermod
 {
 private:
 
-  // ==================================================
-  // CONFIG GENERAL
-  // ==================================================
-
   bool enabled = true;
-  uint8_t effectId = 255;
+
+  uint8_t effectIdRGB = 255;
+  uint8_t effectIdWarm = 255;
+  uint8_t effectIdNeutral = 255;
+  uint8_t effectIdCool = 255;
 
   static KitchenRGBUsermod* instance;
 
@@ -53,7 +67,7 @@ private:
 
 
   // ==================================================
-  // SEGMENT AUTO FIX
+  // SEGMENT AUTO-FIX
   // ==================================================
 
   uint32_t lastSegmentCheck = 0;
@@ -67,6 +81,7 @@ private:
   {
     if (x <= 0.0f) return 0.0f;
     if (x >= 1.0f) return 1.0f;
+
     return x;
   }
 
@@ -75,9 +90,21 @@ private:
   {
     x = clamp01(x);
 
+    return x * x * (3.0f - 2.0f * x);
+  }
+
+
+  // ==================================================
+  // ESTE EFECTUL NOSTRU?
+  // ==================================================
+
+  bool isOurEffect(uint8_t mode)
+  {
     return
-      x * x *
-      (3.0f - 2.0f * x);
+      mode == effectIdRGB ||
+      mode == effectIdWarm ||
+      mode == effectIdNeutral ||
+      mode == effectIdCool;
   }
 
 
@@ -105,9 +132,6 @@ private:
 
   // ==================================================
   // FLOW SPEED
-  //
-  // 0   = foarte lent
-  // 255 = foarte rapid
   // ==================================================
 
   static uint32_t flowToDuration(uint8_t value)
@@ -127,8 +151,6 @@ private:
 
   // ==================================================
   // COLOR LENGTH
-  //
-  // Se adapteaza automat la lungimea segmentului.
   // ==================================================
 
   static float getColorLength(
@@ -154,15 +176,12 @@ private:
 
 
   // ==================================================
-  // WAVE FADE
+  // WAVE FADE RGB
   //
   // custom3 = 0...31
-  //
-  // 0  = aproximativ 1 pixel
-  // 31 = aproximativ 15 pixeli
   // ==================================================
 
-  static float getWaveFade(uint8_t value)
+  static float getRGBWaveFade(uint8_t value)
   {
     return
       1.0f +
@@ -175,13 +194,30 @@ private:
 
 
   // ==================================================
+  // WAVE FADE WHITE
+  //
+  // intensity = 0...255
+  // ==================================================
+
+  static float getWhiteWaveFade(uint8_t value)
+  {
+    return
+      1.0f +
+      (
+        (float)value /
+        255.0f
+      ) *
+      14.0f;
+  }
+
+
+  // ==================================================
   // RAINBOW
   // ==================================================
 
   static uint32_t rainbowColor(uint8_t pos)
   {
-    pos =
-      255 - pos;
+    pos = 255 - pos;
 
     uint8_t r;
     uint8_t g;
@@ -189,54 +225,33 @@ private:
 
     if (pos < 85)
     {
-      r =
-        255 - pos * 3;
-
-      g =
-        0;
-
-      b =
-        pos * 3;
+      r = 255 - pos * 3;
+      g = 0;
+      b = pos * 3;
     }
     else if (pos < 170)
     {
       pos -= 85;
 
-      r =
-        0;
-
-      g =
-        pos * 3;
-
-      b =
-        255 - pos * 3;
+      r = 0;
+      g = pos * 3;
+      b = 255 - pos * 3;
     }
     else
     {
       pos -= 170;
 
-      r =
-        pos * 3;
-
-      g =
-        255 - pos * 3;
-
-      b =
-        0;
+      r = pos * 3;
+      g = 255 - pos * 3;
+      b = 0;
     }
 
-    return
-      RGBW32(
-        r,
-        g,
-        b,
-        0
-      );
+    return RGBW32(r, g, b, 0);
   }
 
 
   // ==================================================
-  // COLOR BLEND
+  // BLEND CULORI
   // ==================================================
 
   static uint32_t blendColors(
@@ -245,34 +260,17 @@ private:
     float amount
   )
   {
-    amount =
-      clamp01(amount);
+    amount = clamp01(amount);
 
-    uint8_t aw =
-      (a >> 24) & 0xFF;
+    uint8_t aw = (a >> 24) & 0xFF;
+    uint8_t ar = (a >> 16) & 0xFF;
+    uint8_t ag = (a >> 8) & 0xFF;
+    uint8_t ab = a & 0xFF;
 
-    uint8_t ar =
-      (a >> 16) & 0xFF;
-
-    uint8_t ag =
-      (a >> 8) & 0xFF;
-
-    uint8_t ab =
-      a & 0xFF;
-
-
-    uint8_t bw =
-      (b >> 24) & 0xFF;
-
-    uint8_t br =
-      (b >> 16) & 0xFF;
-
-    uint8_t bg =
-      (b >> 8) & 0xFF;
-
-    uint8_t bb =
-      b & 0xFF;
-
+    uint8_t bw = (b >> 24) & 0xFF;
+    uint8_t br = (b >> 16) & 0xFF;
+    uint8_t bg = (b >> 8) & 0xFF;
+    uint8_t bb = b & 0xFF;
 
     uint8_t w =
       aw +
@@ -294,19 +292,12 @@ private:
       (int16_t)(bb - ab) *
       amount;
 
-
-    return
-      RGBW32(
-        r,
-        g,
-        blue,
-        w
-      );
+    return RGBW32(r, g, blue, w);
   }
 
 
   // ==================================================
-  // REDUCERE LUMINOZITATE PENTRU WAVE
+  // SCALE COLOR
   // ==================================================
 
   static uint32_t scaleColor(
@@ -314,21 +305,12 @@ private:
     float level
   )
   {
-    level =
-      clamp01(level);
+    level = clamp01(level);
 
-    uint8_t w =
-      (color >> 24) & 0xFF;
-
-    uint8_t r =
-      (color >> 16) & 0xFF;
-
-    uint8_t g =
-      (color >> 8) & 0xFF;
-
-    uint8_t b =
-      color & 0xFF;
-
+    uint8_t w = (color >> 24) & 0xFF;
+    uint8_t r = (color >> 16) & 0xFF;
+    uint8_t g = (color >> 8) & 0xFF;
+    uint8_t b = color & 0xFF;
 
     w =
       (uint8_t)(
@@ -354,38 +336,22 @@ private:
         level
       );
 
-
-    return
-      RGBW32(
-        r,
-        g,
-        b,
-        w
-      );
+    return RGBW32(r, g, b, w);
   }
 
 
   // ==================================================
-  // CULOAREA SELECTATA DE UTILIZATOR
-  //
-  // Color 1 este mereu activ.
-  //
-  // check2 = Use Color 2
-  // check3 = Use Color 3
+  // CULORILE USERULUI
   // ==================================================
 
-  static uint32_t userFlowColor(
-    float cyclePosition
-  )
+  static uint32_t userFlowColor(float cyclePosition)
   {
     uint32_t colors[3];
 
     uint8_t count = 0;
 
-
     colors[count++] =
       SEGCOLOR(0);
-
 
     if (SEGMENT.check2)
     {
@@ -393,42 +359,27 @@ private:
         SEGCOLOR(1);
     }
 
-
     if (SEGMENT.check3)
     {
       colors[count++] =
         SEGCOLOR(2);
     }
 
-
-    // ------------------------------------------
-    // O singura culoare
-    // ------------------------------------------
-
     if (count == 1)
     {
-      return
-        colors[0];
+      return colors[0];
     }
-
-
-    // ------------------------------------------
-    // Normalizam pozitia intre 0 si 1
-    // ------------------------------------------
 
     cyclePosition =
       cyclePosition -
       floorf(cyclePosition);
 
-
     float scaled =
       cyclePosition *
       (float)count;
 
-
     uint8_t index =
       (uint8_t)floorf(scaled);
-
 
     if (index >= count)
     {
@@ -436,21 +387,16 @@ private:
         count - 1;
     }
 
-
     uint8_t next =
       (index + 1) %
       count;
-
 
     float local =
       scaled -
       floorf(scaled);
 
-
-    // Curba mai fina intre culori
     local =
       smoothStep(local);
-
 
     return
       blendColors(
@@ -462,12 +408,11 @@ private:
 
 
   // ==================================================
-  // CULOARE FINALA FLOW
+  // RGB FLOW COLOR
   // ==================================================
 
   static uint32_t flowColor(
     uint16_t pixel,
-    uint16_t length,
     float colorLength,
     uint32_t flowDuration,
     uint32_t flowEpoch
@@ -479,25 +424,17 @@ private:
         flowEpoch
       );
 
-
     float phase =
       elapsed /
       (float)flowDuration;
-
 
     float spatial =
       (float)pixel /
       colorLength;
 
-
     float position =
       spatial +
       phase;
-
-
-    // ------------------------------------------
-    // RAINBOW
-    // ------------------------------------------
 
     if (SEGMENT.check1)
     {
@@ -505,30 +442,64 @@ private:
         position -
         floorf(position);
 
-
       uint8_t hue =
         (uint8_t)(
           wrapped *
           255.0f
         );
 
-
-      return
-        rainbowColor(hue);
+      return rainbowColor(hue);
     }
 
-
-    // ------------------------------------------
-    // CULORILE ALES DE UTILIZATOR
-    // ------------------------------------------
-
-    return
-      userFlowColor(position);
+    return userFlowColor(position);
   }
 
 
   // ==================================================
-  // MASCA WAVE ON / OFF
+  // ALBURI FIXE
+  //
+  // Banda este RGB, fara canal W.
+  // Albul este simulat din RGB.
+  // ==================================================
+
+  static uint32_t warmWhiteColor()
+  {
+    // aprox. 2700-3000K
+    return RGBW32(
+      255,
+      190,
+      110,
+      0
+    );
+  }
+
+
+  static uint32_t neutralWhiteColor()
+  {
+    // aprox. 4000K
+    return RGBW32(
+      255,
+      245,
+      235,
+      0
+    );
+  }
+
+
+  static uint32_t coolWhiteColor()
+  {
+    // aprox. 6000-6500K
+    return RGBW32(
+      210,
+      230,
+      255,
+      0
+    );
+  }
+
+
+  // ==================================================
+  // WAVE LEVEL
   // ==================================================
 
   static float waveLevel(
@@ -542,17 +513,12 @@ private:
     if (length == 0)
       return 0.0f;
 
-
     float lastPixel =
       (float)(
         length - 1
       );
 
-
-    // ==================================================
     // ON
-    // ==================================================
-
     if (!turningOff)
     {
       float head =
@@ -562,23 +528,15 @@ private:
           fadeWidth
         );
 
-
       float distance =
         head -
         (float)pos;
 
-
       if (distance <= 0.0f)
-      {
         return 0.0f;
-      }
-
 
       if (distance >= fadeWidth)
-      {
         return 1.0f;
-      }
-
 
       return
         smoothStep(
@@ -587,11 +545,7 @@ private:
         );
     }
 
-
-    // ==================================================
     // OFF
-    // ==================================================
-
     float head =
       lastPixel -
       progress *
@@ -600,23 +554,15 @@ private:
         fadeWidth
       );
 
-
     float distance =
       (float)pos -
       head;
 
-
     if (distance <= 0.0f)
-    {
       return 1.0f;
-    }
-
 
     if (distance >= fadeWidth)
-    {
       return 0.0f;
-    }
-
 
     return
       1.0f -
@@ -628,44 +574,34 @@ private:
 
 
   // ==================================================
-  // EFFECT
+  // RGB WAVE FLOW
   // ==================================================
 
   static uint16_t mode_kitchen_rgb_wave()
   {
     if (SEGLEN == 0)
-    {
       return FRAMETIME;
-    }
-
 
     KitchenRGBUsermod* mod =
       instance;
 
-
     if (mod == nullptr)
-    {
       return FRAMETIME;
-    }
-
 
     uint32_t onDuration =
       timeToDuration(
         SEGMENT.speed
       );
 
-
     uint32_t offDuration =
       timeToDuration(
         SEGMENT.custom1
       );
 
-
     uint32_t flowDuration =
       flowToDuration(
         SEGMENT.custom2
       );
-
 
     float colorLength =
       getColorLength(
@@ -673,16 +609,10 @@ private:
         SEGLEN
       );
 
-
     float fadeWidth =
-      getWaveFade(
+      getRGBWaveFade(
         SEGMENT.custom3
       );
-
-
-    // ==================================================
-    // FINAL OFF
-    // ==================================================
 
     if (
       mod->finalizeOff ||
@@ -690,15 +620,207 @@ private:
     )
     {
       SEGMENT.fill(0);
+      return FRAMETIME;
+    }
+
+
+    // OFF WAVE
+    if (mod->offAnimating)
+    {
+      float progress =
+        (float)(
+          millis() -
+          mod->offStart
+        ) /
+        (float)offDuration;
+
+      if (progress >= 1.0f)
+      {
+        SEGMENT.fill(0);
+
+        mod->offAnimating =
+          false;
+
+        mod->finalizeOff =
+          true;
+
+        return FRAMETIME;
+      }
+
+      progress =
+        clamp01(progress);
+
+      for (uint16_t i = 0; i < SEGLEN; i++)
+      {
+        uint32_t color =
+          flowColor(
+            i,
+            colorLength,
+            flowDuration,
+            mod->flowEpoch
+          );
+
+        float level =
+          waveLevel(
+            i,
+            SEGLEN,
+            progress,
+            fadeWidth,
+            true
+          );
+
+        SEGMENT.setPixelColor(
+          i,
+          scaleColor(
+            color,
+            level
+          )
+        );
+      }
 
       return FRAMETIME;
     }
 
 
-    // ==================================================
-    // OFF WAVE
-    // ==================================================
+    // INITIALIZARE
+    if (SEGENV.call == 0)
+    {
+      mod->onAnimating =
+        true;
 
+      mod->onStart =
+        millis();
+
+      mod->flowEpoch =
+        millis();
+    }
+
+
+    float onProgress =
+      1.0f;
+
+    if (mod->onAnimating)
+    {
+      onProgress =
+        (float)(
+          millis() -
+          mod->onStart
+        ) /
+        (float)onDuration;
+
+      if (onProgress >= 1.0f)
+      {
+        onProgress =
+          1.0f;
+
+        mod->onAnimating =
+          false;
+      }
+      else
+      {
+        onProgress =
+          clamp01(onProgress);
+      }
+    }
+
+
+    for (uint16_t i = 0; i < SEGLEN; i++)
+    {
+      uint32_t color =
+        flowColor(
+          i,
+          colorLength,
+          flowDuration,
+          mod->flowEpoch
+        );
+
+      float level =
+        1.0f;
+
+      if (mod->onAnimating)
+      {
+        level =
+          waveLevel(
+            i,
+            SEGLEN,
+            onProgress,
+            fadeWidth,
+            false
+          );
+      }
+
+      SEGMENT.setPixelColor(
+        i,
+        scaleColor(
+          color,
+          level
+        )
+      );
+    }
+
+    return FRAMETIME;
+  }
+
+
+  // ==================================================
+  // EFECT ALB STATIC CU WAVE
+  // ==================================================
+
+  static uint16_t mode_kitchen_white_wave()
+  {
+    if (SEGLEN == 0)
+      return FRAMETIME;
+
+    KitchenRGBUsermod* mod =
+      instance;
+
+    if (mod == nullptr)
+      return FRAMETIME;
+
+
+    uint32_t onDuration =
+      timeToDuration(
+        SEGMENT.speed
+      );
+
+    uint32_t offDuration =
+      timeToDuration(
+        SEGMENT.custom1
+      );
+
+    float fadeWidth =
+      getWhiteWaveFade(
+        SEGMENT.intensity
+      );
+
+
+    uint32_t color =
+      warmWhiteColor();
+
+
+    if (SEGMENT.mode == mod->effectIdNeutral)
+    {
+      color =
+        neutralWhiteColor();
+    }
+    else if (SEGMENT.mode == mod->effectIdCool)
+    {
+      color =
+        coolWhiteColor();
+    }
+
+
+    if (
+      mod->finalizeOff ||
+      mod->ignoreNextStateChange
+    )
+    {
+      SEGMENT.fill(0);
+      return FRAMETIME;
+    }
+
+
+    // OFF
     if (mod->offAnimating)
     {
       float progress =
@@ -727,22 +849,8 @@ private:
         clamp01(progress);
 
 
-      for (
-        uint16_t i = 0;
-        i < SEGLEN;
-        i++
-      )
+      for (uint16_t i = 0; i < SEGLEN; i++)
       {
-        uint32_t color =
-          flowColor(
-            i,
-            SEGLEN,
-            colorLength,
-            flowDuration,
-            mod->flowEpoch
-          );
-
-
         float level =
           waveLevel(
             i,
@@ -751,7 +859,6 @@ private:
             fadeWidth,
             true
           );
-
 
         SEGMENT.setPixelColor(
           i,
@@ -767,10 +874,7 @@ private:
     }
 
 
-    // ==================================================
-    // INITIALIZARE EFECT
-    // ==================================================
-
+    // INITIALIZARE
     if (SEGENV.call == 0)
     {
       mod->onAnimating =
@@ -784,17 +888,13 @@ private:
     }
 
 
-    // ==================================================
-    // ON WAVE
-    // ==================================================
-
-    float onLevelProgress =
+    float onProgress =
       1.0f;
 
 
     if (mod->onAnimating)
     {
-      onLevelProgress =
+      onProgress =
         (float)(
           millis() -
           mod->onStart
@@ -802,9 +902,9 @@ private:
         (float)onDuration;
 
 
-      if (onLevelProgress >= 1.0f)
+      if (onProgress >= 1.0f)
       {
-        onLevelProgress =
+        onProgress =
           1.0f;
 
         mod->onAnimating =
@@ -812,37 +912,16 @@ private:
       }
       else
       {
-        onLevelProgress =
-          clamp01(
-            onLevelProgress
-          );
+        onProgress =
+          clamp01(onProgress);
       }
     }
 
 
-    // ==================================================
-    // DESENARE
-    // ==================================================
-
-    for (
-      uint16_t i = 0;
-      i < SEGLEN;
-      i++
-    )
+    for (uint16_t i = 0; i < SEGLEN; i++)
     {
-      uint32_t color =
-        flowColor(
-          i,
-          SEGLEN,
-          colorLength,
-          flowDuration,
-          mod->flowEpoch
-        );
-
-
       float level =
         1.0f;
-
 
       if (mod->onAnimating)
       {
@@ -850,12 +929,11 @@ private:
           waveLevel(
             i,
             SEGLEN,
-            onLevelProgress,
+            onProgress,
             fadeWidth,
             false
           );
       }
-
 
       SEGMENT.setPixelColor(
         i,
@@ -897,27 +975,17 @@ private:
 
 
   // ==================================================
-  // BUTTON POWER TOGGLE
+  // BUTTON ON/OFF
   // ==================================================
 
   void togglePowerFromButton()
   {
-    // ------------------------------------------
-    // Daca se stinge chiar acum,
-    // o apasare scurta il readuce ON.
-    // ------------------------------------------
-
     if (offAnimating)
     {
       startOnAnimation();
-
       return;
     }
 
-
-    // ------------------------------------------
-    // OFF
-    // ------------------------------------------
 
     if (bri > 0)
     {
@@ -937,10 +1005,6 @@ private:
       return;
     }
 
-
-    // ------------------------------------------
-    // ON
-    // ------------------------------------------
 
     uint8_t target =
       briLast;
@@ -972,13 +1036,21 @@ private:
 
 
   // ==================================================
-  // 5 SEC = RAINBOW ON/OFF
+  // 5-10 SEC = RAINBOW
+  //
+  // Functioneaza numai pe RGB Wave Flow.
   // ==================================================
 
   void toggleRainbow()
   {
     Segment& seg =
       strip.getMainSegment();
+
+
+    if (seg.mode != effectIdRGB)
+    {
+      return;
+    }
 
 
     seg.check1 =
@@ -1000,13 +1072,7 @@ private:
 
 
   // ==================================================
-  // 10 SEC = RESTART EFECT
-  //
-  // Nu schimba:
-  // - culorile
-  // - viteza
-  // - Rainbow
-  // - celelalte setari
+  // 10+ SEC = RESTART EFECT
   // ==================================================
 
   void restartEffect()
@@ -1024,40 +1090,34 @@ private:
 
 
   // ==================================================
-  // BUTTON RELEASE ACTION
+  // BUTTON RELEASE
   // ==================================================
 
   void handleButtonRelease(
     uint32_t duration
   )
   {
-    // < 1 sec
+    // sub 1 sec = ON/OFF
     if (duration < 1000UL)
     {
       togglePowerFromButton();
-
       return;
     }
 
-
-    // 1 sec - 5 sec
-    // NIMIC
+    // 1-5 sec = nimic
     if (duration < 5000UL)
     {
       return;
     }
 
-
-    // 5 sec - 10 sec
+    // 5-10 sec = Rainbow
     if (duration < 10000UL)
     {
       toggleRainbow();
-
       return;
     }
 
-
-    // 10+ sec
+    // 10+ sec = restart efect
     restartEffect();
   }
 
@@ -1104,10 +1164,6 @@ private:
       raw;
 
 
-    // ------------------------------------------
-    // APASAT
-    // ------------------------------------------
-
     if (stableButton == LOW)
     {
       buttonPressed =
@@ -1119,10 +1175,6 @@ private:
       return;
     }
 
-
-    // ------------------------------------------
-    // ELIBERAT
-    // ------------------------------------------
 
     if (buttonPressed)
     {
@@ -1143,16 +1195,7 @@ private:
 
 
   // ==================================================
-  // AUTO FIX SEGMENT
-  //
-  // Daca avem un singur segment,
-  // il extinde automat pe toata lungimea
-  // configurata in LED Preferences.
-  //
-  // Exemplu:
-  // Length = 100
-  // segment blocat la 60
-  // -> devine automat 0...100
+  // AUTO-FIX SEGMENT
   // ==================================================
 
   void ensureFullSegment()
@@ -1261,11 +1304,35 @@ public:
 
     if (enabled)
     {
-      effectId =
+      effectIdRGB =
         strip.addEffect(
-          255,
+          188,
           &mode_kitchen_rgb_wave,
           _data_FX_MODE_KITCHEN_RGB_WAVE
+        );
+
+
+      effectIdWarm =
+        strip.addEffect(
+          189,
+          &mode_kitchen_white_wave,
+          _data_FX_MODE_KITCHEN_WARM_WHITE
+        );
+
+
+      effectIdNeutral =
+        strip.addEffect(
+          190,
+          &mode_kitchen_white_wave,
+          _data_FX_MODE_KITCHEN_NEUTRAL_WHITE
+        );
+
+
+      effectIdCool =
+        strip.addEffect(
+          191,
+          &mode_kitchen_white_wave,
+          _data_FX_MODE_KITCHEN_COOL_WHITE
         );
     }
   }
@@ -1281,10 +1348,6 @@ public:
 
     ensureFullSegment();
 
-
-    // ------------------------------------------
-    // FINAL OFF
-    // ------------------------------------------
 
     if (finalizeOff)
     {
@@ -1347,18 +1410,13 @@ public:
       strip.getMainSegment();
 
 
-    if (
-      seg.mode != effectId
-    )
+    if (!isOurEffect(seg.mode))
     {
       return;
     }
 
 
-    // ==================================================
-    // OFF REQUEST
-    // ==================================================
-
+    // OFF
     if (
       bri == 0 &&
       briOld > 0 &&
@@ -1402,12 +1460,7 @@ public:
     }
 
 
-    // ==================================================
-    // ON REQUEST
-    //
-    // Repornim intotdeauna efectul de la inceput.
-    // ==================================================
-
+    // ON
     if (
       bri > 0 &&
       briOld == 0
@@ -1436,8 +1489,20 @@ public:
       enabled;
 
 
-    cfg["effect-id"] =
-      effectId;
+    cfg["rgb-effect-id"] =
+      effectIdRGB;
+
+
+    cfg["warm-white-id"] =
+      effectIdWarm;
+
+
+    cfg["neutral-white-id"] =
+      effectIdNeutral;
+
+
+    cfg["cool-white-id"] =
+      effectIdCool;
 
 
     cfg["button-gpio"] =
@@ -1470,8 +1535,7 @@ public:
 
   uint16_t getId() override
   {
-    return
-      USERMOD_ID_UNSPECIFIED;
+    return USERMOD_ID_UNSPECIFIED;
   }
 };
 
