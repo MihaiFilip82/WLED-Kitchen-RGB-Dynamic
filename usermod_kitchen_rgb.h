@@ -457,18 +457,15 @@ private:
 
   // ==================================================
   // ALBURI FIXE
-  //
-  // Banda este RGB, fara canal W.
-  // Albul este simulat din RGB.
   // ==================================================
 
   static uint32_t warmWhiteColor()
   {
-    // aprox. 2700-3000K
+    // Warm White mai cald
     return RGBW32(
       255,
-      190,
-      110,
+      150,
+      60,
       0
     );
   }
@@ -476,7 +473,6 @@ private:
 
   static uint32_t neutralWhiteColor()
   {
-    // aprox. 4000K
     return RGBW32(
       255,
       245,
@@ -488,7 +484,6 @@ private:
 
   static uint32_t coolWhiteColor()
   {
-    // aprox. 6000-6500K
     return RGBW32(
       210,
       230,
@@ -518,7 +513,6 @@ private:
         length - 1
       );
 
-    // ON
     if (!turningOff)
     {
       float head =
@@ -545,7 +539,6 @@ private:
         );
     }
 
-    // OFF
     float head =
       lastPixel -
       progress *
@@ -623,8 +616,6 @@ private:
       return FRAMETIME;
     }
 
-
-    // OFF WAVE
     if (mod->offAnimating)
     {
       float progress =
@@ -681,8 +672,6 @@ private:
       return FRAMETIME;
     }
 
-
-    // INITIALIZARE
     if (SEGENV.call == 0)
     {
       mod->onAnimating =
@@ -694,7 +683,6 @@ private:
       mod->flowEpoch =
         millis();
     }
-
 
     float onProgress =
       1.0f;
@@ -722,7 +710,6 @@ private:
           clamp01(onProgress);
       }
     }
-
 
     for (uint16_t i = 0; i < SEGLEN; i++)
     {
@@ -777,7 +764,6 @@ private:
     if (mod == nullptr)
       return FRAMETIME;
 
-
     uint32_t onDuration =
       timeToDuration(
         SEGMENT.speed
@@ -793,10 +779,8 @@ private:
         SEGMENT.intensity
       );
 
-
     uint32_t color =
       warmWhiteColor();
-
 
     if (SEGMENT.mode == mod->effectIdNeutral)
     {
@@ -809,7 +793,6 @@ private:
         coolWhiteColor();
     }
 
-
     if (
       mod->finalizeOff ||
       mod->ignoreNextStateChange
@@ -819,8 +802,6 @@ private:
       return FRAMETIME;
     }
 
-
-    // OFF
     if (mod->offAnimating)
     {
       float progress =
@@ -829,7 +810,6 @@ private:
           mod->offStart
         ) /
         (float)offDuration;
-
 
       if (progress >= 1.0f)
       {
@@ -844,10 +824,8 @@ private:
         return FRAMETIME;
       }
 
-
       progress =
         clamp01(progress);
-
 
       for (uint16_t i = 0; i < SEGLEN; i++)
       {
@@ -869,12 +847,9 @@ private:
         );
       }
 
-
       return FRAMETIME;
     }
 
-
-    // INITIALIZARE
     if (SEGENV.call == 0)
     {
       mod->onAnimating =
@@ -887,10 +862,8 @@ private:
         millis();
     }
 
-
     float onProgress =
       1.0f;
-
 
     if (mod->onAnimating)
     {
@@ -900,7 +873,6 @@ private:
           mod->onStart
         ) /
         (float)onDuration;
-
 
       if (onProgress >= 1.0f)
       {
@@ -916,7 +888,6 @@ private:
           clamp01(onProgress);
       }
     }
-
 
     for (uint16_t i = 0; i < SEGLEN; i++)
     {
@@ -943,7 +914,6 @@ private:
         )
       );
     }
-
 
     return FRAMETIME;
   }
@@ -986,7 +956,6 @@ private:
       return;
     }
 
-
     if (bri > 0)
     {
       bri =
@@ -1005,10 +974,8 @@ private:
       return;
     }
 
-
     uint8_t target =
       briLast;
-
 
     if (target == 0)
     {
@@ -1016,9 +983,7 @@ private:
         128;
     }
 
-
     startOnAnimation();
-
 
     bri =
       target;
@@ -1037,8 +1002,6 @@ private:
 
   // ==================================================
   // 5-10 SEC = RAINBOW
-  //
-  // Functioneaza numai pe RGB Wave Flow.
   // ==================================================
 
   void toggleRainbow()
@@ -1046,21 +1009,17 @@ private:
     Segment& seg =
       strip.getMainSegment();
 
-
     if (seg.mode != effectIdRGB)
     {
       return;
     }
 
-
     seg.check1 =
       !seg.check1;
-
 
     seg.markForReset();
 
     strip.trigger();
-
 
     stateChanged =
       true;
@@ -1097,27 +1056,23 @@ private:
     uint32_t duration
   )
   {
-    // sub 1 sec = ON/OFF
     if (duration < 1000UL)
     {
       togglePowerFromButton();
       return;
     }
 
-    // 1-5 sec = nimic
     if (duration < 5000UL)
     {
       return;
     }
 
-    // 5-10 sec = Rainbow
     if (duration < 10000UL)
     {
       toggleRainbow();
       return;
     }
 
-    // 10+ sec = restart efect
     restartEffect();
   }
 
@@ -1133,7 +1088,6 @@ private:
         BUTTON_PIN
       );
 
-
     if (raw != lastRawButton)
     {
       lastRawButton =
@@ -1142,7 +1096,6 @@ private:
       lastButtonChange =
         millis();
     }
-
 
     if (
       millis() -
@@ -1153,16 +1106,13 @@ private:
       return;
     }
 
-
     if (raw == stableButton)
     {
       return;
     }
 
-
     stableButton =
       raw;
-
 
     if (stableButton == LOW)
     {
@@ -1175,17 +1125,14 @@ private:
       return;
     }
 
-
     if (buttonPressed)
     {
       uint32_t duration =
         millis() -
         buttonPressStart;
 
-
       buttonPressed =
         false;
-
 
       handleButtonRelease(
         duration
@@ -1209,10 +1156,8 @@ private:
       return;
     }
 
-
     lastSegmentCheck =
       millis();
-
 
     if (
       strip.getSegmentsNum() != 1
@@ -1221,20 +1166,16 @@ private:
       return;
     }
 
-
     uint16_t total =
       strip.getLengthTotal();
-
 
     if (total == 0)
     {
       return;
     }
 
-
     Segment& seg =
       strip.getSegment(0);
-
 
     if (
       seg.start == 0 &&
@@ -1243,7 +1184,6 @@ private:
     {
       return;
     }
-
 
     uint8_t grp =
       seg.grouping;
@@ -1254,9 +1194,7 @@ private:
     uint16_t ofs =
       seg.offset;
 
-
     strip.suspend();
-
 
     seg.setGeometry(
       0,
@@ -1266,9 +1204,7 @@ private:
       ofs
     );
 
-
     strip.resume();
-
 
     strip.trigger();
   }
@@ -1285,22 +1221,18 @@ public:
     instance =
       this;
 
-
     pinMode(
       BUTTON_PIN,
       INPUT_PULLUP
     );
-
 
     lastRawButton =
       digitalRead(
         BUTTON_PIN
       );
 
-
     stableButton =
       lastRawButton;
-
 
     if (enabled)
     {
@@ -1311,7 +1243,6 @@ public:
           _data_FX_MODE_KITCHEN_RGB_WAVE
         );
 
-
       effectIdWarm =
         strip.addEffect(
           189,
@@ -1319,14 +1250,12 @@ public:
           _data_FX_MODE_KITCHEN_WARM_WHITE
         );
 
-
       effectIdNeutral =
         strip.addEffect(
           190,
           &mode_kitchen_white_wave,
           _data_FX_MODE_KITCHEN_NEUTRAL_WHITE
         );
-
 
       effectIdCool =
         strip.addEffect(
@@ -1348,20 +1277,16 @@ public:
 
     ensureFullSegment();
 
-
     if (finalizeOff)
     {
       ignoreNextStateChange =
         true;
 
-
       bool oldFadeTransition =
         fadeTransition;
 
-
       fadeTransition =
         false;
-
 
       bri =
         0;
@@ -1369,19 +1294,15 @@ public:
       briT =
         0;
 
-
       stateChanged =
         true;
-
 
       stateUpdated(
         CALL_MODE_NO_NOTIFY
       );
 
-
       fadeTransition =
         oldFadeTransition;
-
 
       finalizeOff =
         false;
@@ -1405,18 +1326,14 @@ public:
       return;
     }
 
-
     Segment& seg =
       strip.getMainSegment();
-
 
     if (!isOurEffect(seg.mode))
     {
       return;
     }
 
-
-    // OFF
     if (
       bri == 0 &&
       briOld > 0 &&
@@ -1427,13 +1344,11 @@ public:
       savedBrightness =
         briOld;
 
-
       if (savedBrightness == 0)
       {
         savedBrightness =
           briLast;
       }
-
 
       bri =
         savedBrightness;
@@ -1441,26 +1356,20 @@ public:
       briT =
         savedBrightness;
 
-
       onAnimating =
         false;
-
 
       offStart =
         millis();
 
-
       offAnimating =
         true;
-
 
       strip.trigger();
 
       return;
     }
 
-
-    // ON
     if (
       bri > 0 &&
       briOld == 0
@@ -1484,26 +1393,20 @@ public:
         "Kitchen RGB"
       );
 
-
     cfg["enabled"] =
       enabled;
-
 
     cfg["rgb-effect-id"] =
       effectIdRGB;
 
-
     cfg["warm-white-id"] =
       effectIdWarm;
-
 
     cfg["neutral-white-id"] =
       effectIdNeutral;
 
-
     cfg["cool-white-id"] =
       effectIdCool;
-
 
     cfg["button-gpio"] =
       BUTTON_PIN;
@@ -1517,17 +1420,14 @@ public:
     JsonObject cfg =
       root["Kitchen RGB"];
 
-
     if (cfg.isNull())
     {
       return false;
     }
 
-
     enabled =
       cfg["enabled"] |
       true;
-
 
     return true;
   }
