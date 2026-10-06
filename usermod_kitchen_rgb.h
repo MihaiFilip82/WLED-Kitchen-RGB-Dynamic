@@ -35,7 +35,54 @@ private:
 
 
   // ==================================================
-  // EFECT RGB FLOW
+  // RAINBOW WHEEL
+  //
+  // Generează tranziție lină:
+  // roșu -> verde -> albastru -> roșu
+  // ==================================================
+
+  static uint32_t rainbowColor(uint8_t pos)
+  {
+    pos = 255 - pos;
+
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+
+    if (pos < 85)
+    {
+      r = 255 - pos * 3;
+      g = 0;
+      b = pos * 3;
+    }
+    else if (pos < 170)
+    {
+      pos -= 85;
+
+      r = 0;
+      g = pos * 3;
+      b = 255 - pos * 3;
+    }
+    else
+    {
+      pos -= 170;
+
+      r = pos * 3;
+      g = 255 - pos * 3;
+      b = 0;
+    }
+
+    return RGBW32(
+      r,
+      g,
+      b,
+      0
+    );
+  }
+
+
+  // ==================================================
+  // KITCHEN RGB FLOW
   // ==================================================
 
   static uint16_t mode_kitchen_rgb_flow()
@@ -44,9 +91,9 @@ private:
       return FRAMETIME;
 
 
-    // --------------------------------------------------
-    // Viteza animației
-    // --------------------------------------------------
+    // ==================================================
+    // SPEED
+    // ==================================================
 
     uint32_t duration =
       speedToDuration(
@@ -54,9 +101,9 @@ private:
       );
 
 
-    // --------------------------------------------------
-    // Faza curentă a culorilor
-    // --------------------------------------------------
+    // ==================================================
+    // FAZA ANIMAȚIEI
+    // ==================================================
 
     uint32_t now =
       millis();
@@ -71,15 +118,15 @@ private:
       );
 
 
-    // --------------------------------------------------
+    // ==================================================
     // COLOR LENGTH
     //
-    // intensity mic:
-    // multe culori / gradient mai scurt
+    // 0:
+    // gradient scurt, mai multe culori
     //
-    // intensity mare:
-    // gradient lung / culori mai întinse
-    // --------------------------------------------------
+    // 255:
+    // gradient lung, foarte fluid
+    // ==================================================
 
     float colorLength =
       4.0f +
@@ -90,9 +137,9 @@ private:
       60.0f;
 
 
-    // --------------------------------------------------
-    // Desenăm banda
-    // --------------------------------------------------
+    // ==================================================
+    // DESENĂM BANDA
+    // ==================================================
 
     for (uint16_t i = 0; i < SEGLEN; i++)
     {
@@ -111,9 +158,10 @@ private:
         hueOffset;
 
 
-      // color_wheel() generează tranziție RGB lină
       uint32_t color =
-        color_wheel(hue);
+        rainbowColor(
+          hue
+        );
 
 
       SEGMENT.setPixelColor(
@@ -149,8 +197,6 @@ public:
 
   // ==================================================
   // LOOP
-  //
-  // Necesar pentru Usermod în WLED 0.15.3
   // ==================================================
 
   void loop() override
