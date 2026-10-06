@@ -1,0 +1,75 @@
+name: Build WLED Kitchen RGB Dynamic
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "usermod_kitchen_rgb.h"
+      - ".github/workflows/build.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout custom repository
+        uses: actions/checkout@v4
+
+      - name: Checkout WLED 0.15.3
+        uses: actions/checkout@v4
+        with:
+          repository: wled/WLED
+          ref: v0.15.3
+          path: WLED
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+
+      - name: Copy Kitchen RGB usermod
+        run: |
+          mkdir -p WLED/usermods/KitchenRGB
+          cp usermod_kitchen_rgb.h WLED/usermods/KitchenRGB/usermod_kitchen_rgb.h
+
+      - name: Register Kitchen RGB usermod
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("WLED/wled00/usermods_list.cpp")
+          text = p.read_text()
+
+          include_line = '#include "../usermods/KitchenRGB/usermod_kitchen_rgb.h"\n'
+
+          if include_line not in text:
+              text = include_line + text
+
+          marker = """void registerUsermods()
+          {"""
+
+          replacement = """void registerUsermods()
+          {
+            UsermodManager::add(new KitchenRGBUsermod());"""
+
+          if "UsermodManager::add(new KitchenRGBUsermod());" not in text:
+              if marker not in text:
+                  raise SystemExit("Could not find registerUsermods() in usermods_list.cpp")
+
+              text = text.replace(marker, replacement, 1)
+
+          p.write_text(text)
+          PY
+
+      - name: Build firmware
+        working-directory: WLED
+        run: |
+          pio run -e esp32dev
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WLED-0.15.3-Kitchen-RGB-Dynamic
+          path: WLED/.pio/build/esp32dev/firmware.bin
